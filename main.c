@@ -1,8 +1,19 @@
 #include <stdio.h>
 #include "mpc.h"
-#include "d-function.h"
 
-char * readline(char * read){
+enum{LVAL_NUM,LVAL_ERR};
+enum{LERR_DIV_ZERO,LERR_BAD_OP,LERR_BAD_NUM};
+
+typedef struct lval{
+	
+	int type;
+	int err;
+	long num;
+}lval;
+
+
+
+char * readline(char * read) {
 	fputs(read,stdout);
 	char *in=(char *)malloc(sizeof(char)*50);
 	gets(in);
@@ -11,39 +22,96 @@ char * readline(char * read){
 }
 
 
-long eval(mpc_ast_t *t){
 
-if(strstr(t->tag,"number"))
-	return atoi(t->contents);
-
-char *op=t->children[1]->contents;
-//printf("%c \n",*op);
-long ctal=eval(t->children[2]);
-
-int i=3;
-while(strstr(t->children[i]->tag,"expr"))
-{
-	ctal=eval_op(ctal,op,eval(t->children[i]));
-	i++;
+lval lval_num(long x) {
+  lval v;
+  v.type = LVAL_NUM;
+  v.num = x;
+  return v;
 }
-return ctal;
+lval lval_err(int err){
 
+	lval nlval;
+	nlval.type=LVAL_ERR;
+	nlval.err=err;
+	return nlval;
 }
 
-long eval_op(long x,char  *op,long y){
- switch (*op)
-	{
-	case'+':
-		return x + y;
-	case'-':
-		return x - y;
-	case'*':
-		return x*y;
-	case'/':
-		return x / y;
-	}
-	return 0;
+lval eval_op(lval x, char* op, lval y) {
+
+  /* If either value is an error return it */
+  if (x.type == LVAL_ERR) { return x; }
+  if (y.type == LVAL_ERR) { return y; }
+
+  /* Otherwise do maths on the number values */
+  if (strcmp(op, "+") == 0) { return lval_num(x.num + y.num); }
+  if (strcmp(op, "-") == 0) { return lval_num(x.num - y.num); }
+  if (strcmp(op, "*") == 0) { return lval_num(x.num * y.num); }
+  if (strcmp(op, "/") == 0) {
+    /* If second operand is zero return error */
+    return y.num == 0 
+      ? lval_err(LERR_DIV_ZERO) 
+      : lval_num(x.num / y.num);
+  }
+
+  return lval_err(LERR_BAD_OP);
 }
+
+lval eval(mpc_ast_t* t) {
+
+  if (strstr(t->tag, "number")) {
+    /* Check if there is some error in conversion */
+    errno = 0;
+    long x = strtol(t->contents, NULL, 10);
+    return errno != ERANGE ? lval_num(x) : lval_err(LERR_BAD_NUM);
+  }
+
+  char* op = t->children[1]->contents;  
+  lval x = eval(t->children[2]);
+
+  int i = 3;
+  while (strstr(t->children[i]->tag, "expr")) {
+    x = eval_op(x, op, eval(t->children[i]));
+    i++;
+  }
+
+  return x;  
+}
+
+	
+
+
+
+
+
+void lval_print(lval a){	
+	switch(a.type){
+		case LVAL_NUM: 
+			printf("%d",a.num);
+			break;
+		case LVAL_ERR:
+			switch(a.err){
+				
+				case LERR_BAD_OP:
+					printf("bad op\n");
+					break;
+				case LERR_DIV_ZERO:
+					printf("don't div 0 \n");
+					break;
+				case LERR_BAD_NUM:
+					printf("ivalid num \n");
+					break;
+				
+			}
+			
+		}
+	
+}
+
+
+
+
+
 
 int main(){
  mpc_parser_t* Number   = mpc_new("number");
@@ -74,8 +142,8 @@ int main(){
       /* On success print and delete the AST */
       mpc_ast_print(r.output);
 	  
-	  long x;
-	  printf("%d \n",x=eval(r.output));
+	  lval x=eval(r.output);
+	  lval_print(x);
 	  
       mpc_ast_delete(r.output);
     } else {

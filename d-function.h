@@ -1,4 +1,12 @@
-
+#ifndef GRANDFATHER_H
+#define GRANDFATHER_H
 char * readline(char * read);
-long eval_op(long x,char  *op,long y);
-long eval(mpc_ast_t *t);
+
+
+
+lval eval(mpc_ast_t *t);
+
+
+	
+
+#endif /* GRANDFATHER_H */
