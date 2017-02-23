@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "mpc.h"
+#include "d-function.h"
 
 char * readline(char * read){
 	fputs(read,stdout);
@@ -8,10 +9,43 @@ char * readline(char * read){
 	return in ;
 	
 }
-void add_history(char* unused) {}
 
-int main()
+
+long eval(mpc_ast_t *t){
+
+if(strstr(t->tag,"number"))
+	return atoi(t->contents);
+
+char *op=t->children[1]->contents;
+//printf("%c \n",*op);
+long ctal=eval(t->children[2]);
+
+int i=3;
+while(strstr(t->children[i]->tag,"expr"))
 {
+	ctal=eval_op(ctal,op,eval(t->children[i]));
+	i++;
+}
+return ctal;
+
+}
+
+long eval_op(long x,char  *op,long y){
+ switch (*op)
+	{
+	case'+':
+		return x + y;
+	case'-':
+		return x - y;
+	case'*':
+		return x*y;
+	case'/':
+		return x / y;
+	}
+	return 0;
+}
+
+int main(){
  mpc_parser_t* Number   = mpc_new("number");
   mpc_parser_t* Operator = mpc_new("operator");
   mpc_parser_t* Expr     = mpc_new("expr");
@@ -32,13 +66,17 @@ int main()
 
   while (1) {
     char* input = readline("lispy> ");
-    add_history(input);
+ 
 
     /* Attempt to parse the user input */
     mpc_result_t r;
     if (mpc_parse("<stdin>", input, Lispy, &r)) {
       /* On success print and delete the AST */
       mpc_ast_print(r.output);
+	  
+	  long x;
+	  printf("%d \n",x=eval(r.output));
+	  
       mpc_ast_delete(r.output);
     } else {
       /* Otherwise print and delete the Error */
